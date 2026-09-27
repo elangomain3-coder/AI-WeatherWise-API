@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+  <title>WeatherWise | Modern Weather App</title>
+  <!-- Tailwind CSS CDN + basic interceptions -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Custom smooth overrides / optional background transitions -->
+  <style>
+    /* Smooth transition for background & card */
+    body {
+      transition: background-color 0.4s ease, background-image 0.3s ease;
+      min-height: 100vh;
+    }
+    /* custom loading spin */
+    .loader {
+      width: 32px;
+      height: 32px;
+      border: 4px solid #e2e8f0;
+      border-top: 4px solid #3b82f6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    /* subtle fade-in for weather card */
+    .weather-card {
+      transition: all 0.2s ease;
+    }
+    input:focus {
+      outline: none;
+      ring: 2px solid #3b82f6;
+    }
+  </style>
+</head>
+<body class="font-sans antialiased flex items-center justify-center p-4 md:p-6 min-h-screen"
+      style="background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%);">
+
+  <!-- Main container: centered card layout, fully responsive -->
+  <div class="w-full max-w-md md:max-w-lg lg:max-w-xl transition-all duration-300">
+    
+    <!-- Weather Card with rounded corners, shadow, glassmorphism effect -->
+    <div class="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl overflow-hidden p-6 md:p-8 weather-card border border-white/20">
+      
+      <!-- Header / title -->
+      <div class="text-center mb-6">
+        <h1 class="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-700 to-sky-600 bg-clip-text text-transparent">
+          🌤️ WeatherWise
+        </h1>
+        <p class="text-gray-500 text-sm mt-1">Real-time forecast, anywhere</p>
+      </div>
+
+      <!-- Search Section: input + button (flex, responsive) -->
+      <div class="flex flex-col sm:flex-row gap-3 mb-8">
+        <input type="text" id="cityInput" 
+               placeholder="e.g., London, New York, Tokyo" 
+               class="flex-1 px-5 py-3 rounded-2xl border border-gray-300 bg-white/80 text-gray-800 focus:ring-2 focus:ring-blue-400 focus:border-transparent transition shadow-sm text-base"
+               autocomplete="off">
+        <button id="searchBtn" 
+                class="px-6 py-3 bg-gradient-to-r from-blue-600 to-sky-500 hover:from-blue-700 hover:to-sky-600 text-white font-semibold rounded-2xl shadow-md transition transform active:scale-95 flex items-center justify-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          Search
+        </button>
+      </div>
+
+      <!-- Loading indicator (hidden by default) -->
+      <div id="loadingSpinner" class="hidden py-8 flex justify-center">
+        <div class="loader"></div>
+        <span class="ml-3 text-gray-600 font-medium">Fetching weather data...</span>
+      </div>
+
+      <!-- Error message container (dynamic message) -->
+      <div id="errorMessage" class="hidden bg-red-50 border-l-4 border-red-500 text-red-700 p-4 rounded-xl mb-5 text-sm font-medium">
+        <div class="flex items-center gap-2">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+          </svg>
+          <span id="errorText">City not found. Please try again.</span>
+        </div>
+      </div>
+
+      <!-- Weather Info Display (Dynamic, hidden initially) -->
+      <div id="weatherInfo" class="hidden transition-all duration-300">
+        <!-- main city & temperature row -->
+        <div class="text-center border-b border-gray-200 pb-4 mb-4">
+          <h2 id="cityName" class="text-2xl md:text-3xl font-bold text-gray-800">City</h2>
+          <div class="flex items-center justify-center gap-2 mt-2">
+            <span id="temperature" class="text-5xl md:text-6xl font-extrabold text-gray-900">--</span>
+            <span class="text-2xl text-gray-600">°C</span>
+          </div>
+          <div class="flex justify-center items-center mt-2 gap-3">
+            <img id="weatherIcon" src="" alt="weather icon" class="w-14 h-14">
+            <div>
+              <p id="weatherCondition" class="text-xl font-semibold text-gray-700 capitalize">--</p>
+              <p id="weatherDesc" class="text-gray-500 text-sm capitalize">--</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- weather stats grid: humidity + wind speed -->
+        <div class="grid grid-cols-2 gap-5 mt-4">
+          <div class="bg-blue-50/70 rounded-2xl p-4 text-center shadow-inner">
+            <div class="flex items-center justify-center gap-2 text-blue-600">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+              </svg>
+              <span class="font-semibold text-gray-700">Humidity</span>
+            </div>
+            <p id="humidity" class="text-2xl font-bold text-gray-800 mt-1">--%</p>
+          </div>
+          <div class="bg-sky-50/70 rounded-2xl p-4 text-center shadow-inner">
+            <div class="flex items-center justify-center gap-2 text-sky-600">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" />
+              </svg>
+              <span class="font-semibold text-gray-700">Wind Speed</span>
+            </div>
+            <p id="windSpeed" class="text-2xl font-bold text-gray-800 mt-1">-- km/h</p>
+          </div>
+        </div>
+        
+        <!-- extra soft note: feels like optional but adds polish -->
+        <p class="text-xs text-center text-gray-400 mt-6">Data provided by OpenWeatherMap</p>
+      </div>
+
+      <!-- small helper if nothing shown yet (placeholder) -->
+      <div id="emptyState" class="text-center py-8 text-gray-400">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 mx-auto text-gray-300 mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+        </svg>
+        <p>Enter a city and click search 🌍</p>
+      </div>
+    </div>
+    
+    <!-- Footer attribution (optional) -->
+    <div class="text-center text-white/60 text-xs mt-5">
+      ⚡ Real‑time weather • Responsive design
+    </div>
+  </div>
+
+  <!-- JavaScript (ES6) with fetch, dynamic background & error handling -->
+  <script>
+    // -----------------------------
+    // OpenWeatherMap CONFIGURATION
+    // -----------------------------
+    // 🔑 IMPORTANT: Replace 'YOUR_API_KEY' with a valid OpenWeatherMap API key.
+    // Get one free at https://openweathermap.org/api
+    const API_KEY = 'eba24392578705ab40ccb42cac76ff48';   // <-- REPLACE WITH YOUR ACTUAL API KEY
+    const BASE_URL = 'https://api.openweathermap.org/data/2.5/weather';
+
+    // DOM Elements
+    const cityInput = document.getElementById('cityInput');
+    const searchBtn = document.getElementById('searchBtn');
+    const loadingSpinner = document.getElementById('loadingSpinner');
+    const errorMessageDiv = document.getElementById('errorMessage');
+    const errorTextSpan = document.getElementById('errorText');
+    const weatherInfoDiv = document.getElementById('weatherInfo');
+    const emptyStateDiv = document.getElementById('emptyState');
+    
+    // Weather detail fields
+    const cityNameEl = document.getElementById('cityName');
+    const temperatureEl = document.getElementById('temperature');
+    const weatherConditionEl = document.getElementById('weatherCondition');
+    const weatherDescEl = document.getElementById('weatherDesc');
+    const humidityEl = document.getElementById('humidity');
+    const windSpeedEl = document.getElementById('windSpeed');
+    const weatherIconImg = document.getElementById('weatherIcon');
+
+    // Helper: Hide error and show/hide loading
+    function hideError() {
+      errorMessageDiv.classList.add('hidden');
+      errorTextSpan.innerText = '';
+    }
+    
+    function showError(message) {
+      // hide weather & empty state while error visible
+      weatherInfoDiv.classList.add('hidden');
+      emptyStateDiv.classList.add('hidden');
+      errorTextSpan.innerText = message;
+      errorMessageDiv.classList.remove('hidden');
+    }
+    
+    function showLoading(isLoading) {
+      if (isLoading) {
+        loadingSpinner.classList.remove('hidden');
+        weatherInfoDiv.classList.add('hidden');
+        emptyStateDiv.classList.add('hidden');
+        hideError();
+      } else {
+        loadingSpinner.classList.add('hidden');
+      }
+    }
+    
+    // Function to change background based on weather condition (optional extra)
+    function updateBackgroundByWeather(conditionMain, temp) {
+      const body = document.body;
+      // conditionMain example: 'Clear', 'Clouds', 'Rain', 'Drizzle', 'Thunderstorm', 'Snow', 'Mist', etc.
+      let gradientStyle = '';
+      if (!conditionMain) {
+        gradientStyle = 'linear-gradient(145deg, #0f172a 0%, #1e293b 100%)';
+      } else {
+        const lowerCond = conditionMain.toLowerCase();
+        if (lowerCond.includes('clear') || lowerCond.includes('sunny')) {
+          gradientStyle = 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #fcd34d 100%)';
+        } else if (lowerCond.includes('cloud')) {
+          gradientStyle = 'linear-gradient(135deg, #94a3b8 0%, #64748b 50%, #475569 100%)';
+        } else if (lowerCond.includes('rain') || lowerCond.includes('drizzle')) {
+          gradientStyle = 'linear-gradient(135deg, #2c3e50 0%, #1e2a3a 50%, #0f172a 100%)';
+        } else if (lowerCond.includes('thunderstorm')) {
+          gradientStyle = 'linear-gradient(135deg, #1e1b2f 0%, #2d2a3e 50%, #0b081a 100%)';
+        } else if (lowerCond.includes('snow')) {
+          gradientStyle = 'linear-gradient(135deg, #e2e8f0 0%, #cbd5e1 50%, #f1f5f9 100%)';
+        } else if (lowerCond.includes('mist') || lowerCond.includes('fog')) {
+          gradientStyle = 'linear-gradient(135deg, #b9c3d0 0%, #9aaebf 50%, #7f8c8d 100%)';
+        } else {
+          gradientStyle = 'linear-gradient(145deg, #0f172a 0%, #1e293b 100%)';
+        }
+      }
+      body.style.background = gradientStyle;
+      // also adjust text contrast based on brightness for readability? but tailwind card white/90 works fine.
+    }
+    
+    // Main fetch weather function (ES6 async/await)
+    async function fetchWeather(city) {
+      if (!city || city.trim() === '') {
+        showError('❌ Please enter a city name.');
+        emptyStateDiv.classList.remove('hidden');
+        weatherInfoDiv.classList.add('hidden');
+        return false;
+      }
+      
+      const trimmedCity = city.trim();
+      showLoading(true);
+      hideError();
+      
+      try {
+        // Construct API url with units=metric for Celsius
+        const url = `${BASE_URL}?q=${encodeURIComponent(trimmedCity)}&appid=${API_KEY}&units=metric`;
+        
+        const response = await fetch(url);
+        
+        // Handle HTTP errors (city not found, 404, etc.)
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error('City not found. Please check the spelling 🌍');
+          } else if (response.status === 401) {
+            throw new Error('Invalid API key. Please check your OpenWeatherMap key 🔑');
+          } else {
+            throw new Error(`Server error (${response.status}). Try again later.`);
+          }
+        }
+        
+        const data = await response.json();
+        
+        // Ensure data has expected structure
+        if (!data || !data.main || !data.weather || !data.wind) {
+          throw new Error('Incomplete weather data received.');
+        }
+        
+        // Extract data from JSON
+        const cityNameFinal = data.name;
+        const temperatureCelsius = Math.round(data.main.temp);  // rounded
+        const condition = data.weather[0].main;
+        const description = data.weather[0].description;
+        const humidity = data.main.humidity;
+        const windSpeedMetric = (data.wind.speed * 3.6).toFixed(1); // convert m/s to km/h
+        const iconCode = data.weather[0].icon;
+        const iconUrl = `https://openweathermap.org/img/wn/${iconCode}@2x.png`;
+        
+        // Update DOM elements dynamically
+        cityNameEl.textContent = cityNameFinal;
+        temperatureEl.textContent = temperatureCelsius;
+        weatherConditionEl.textContent = condition;
+        weatherDescEl.textContent = description;
+        humidityEl.textContent = `${humidity}%`;
+        windSpeedEl.textContent = `${windSpeedMetric} km/h`;
+        weatherIconImg.src = iconUrl;
+        weatherIconImg.alt = `weather icon ${condition}`;
+        
+        // Change background based on weather condition (optional bonus)
+        updateBackgroundByWeather(condition, temperatureCelsius);
+        
+        // Hide empty state and error, show weather card
+        emptyStateDiv.classList.add('hidden');
+        errorMessageDiv.classList.add('hidden');
+        weatherInfoDiv.classList.remove('hidden');
+        
+        return true;
+        
+      } catch (err) {
+        console.error('Fetch error: ', err.message);
+        // Show appropriate user-friendly error
+        let userMsg = err.message;
+        if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
+          userMsg = '⚠️ Network error. Please check your internet connection and try again.';
+        } else if (err.message.includes('API key')) {
+          userMsg = '🔐 Invalid or missing OpenWeatherMap API key. Please set a valid key.';
+        } else if (err.message.includes('City not found')) {
+          userMsg = `🌆 City "${trimmedCity}" not found. Please verify and try again.`;
+        } else {
+          userMsg = `⚠️ ${err.message || 'Something went wrong. Please try later.'}`;
+        }
+        showError(userMsg);
+        weatherInfoDiv.classList.add('hidden');
+        emptyStateDiv.classList.add('hidden');
+        return false;
+      } finally {
+        showLoading(false);
+      }
+    }
+    
+    // Event listener: search button click
+    searchBtn.addEventListener('click', () => {
+      const cityValue = cityInput.value;
+      fetchWeather(cityValue);
+    });
+    
+    // Allow "Enter" key press in input field
+    cityInput.addEventListener('keypress', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        searchBtn.click();
+      }
+    });
+    
+    // initial demo optional: Prefill favourite city 'London' as example? not required but nice
+    // fetchWeather('London');  (comment - not auto fetching on load to keep empty state clean)
+    // but if we want make user see example, we can show empty state first.
+    // On page load, ensure empty state is visible, hide weather & errors.
+    // Additional edge: API key validation: if key is default, we display a note? Nice for beginners.
+    window.addEventListener('DOMContentLoaded', () => {
+      // check if API key placeholder is still default (demo mode)
+      if (API_KEY === 'YOUR_API_KEY') {
+        // Show a friendly reminder but still allow UI usage (but will fail)
+        const reminderMsg = document.createElement('div');
+        reminderMsg.className = 'text-center mt-2 text-yellow-200 text-xs bg-yellow-900/30 rounded-full px-3 py-1 inline-block mx-auto w-fit';
+        reminderMsg.innerText = '⚠️ Demo: Replace "YOUR_API_KEY" with a real OpenWeatherMap API key.';
+        const parentContainer = document.querySelector('.bg-white/90');
+        if (parentContainer) {
+          const footerNote = parentContainer.querySelector('.text-xs.text-center.text-gray-400');
+          if(footerNote) footerNote.insertAdjacentElement('beforebegin', reminderMsg);
+        }
+      }
+      // ensure initial background is default
+      updateBackgroundByWeather('clear', 20);
+      emptyStateDiv.classList.remove('hidden');
+      weatherInfoDiv.classList.add('hidden');
+      errorMessageDiv.classList.add('hidden');
+      loadingSpinner.classList.add('hidden');
+    });
+    
+    // Also handle empty field validation more gracefully: if search clicked while input empty -> error
+    // already included in fetchWeather's early check.
+    // Additional network error handling: try/catch covers that.
+    // Bonus: Accessibility & responsive ensured by Tailwind
+  </script>
+</body>
+</html>
